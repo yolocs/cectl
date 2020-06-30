@@ -1,45 +1,70 @@
 package utils
 
 import (
-	"encoding/base64"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/cloudevents/sdk-go/v2/event"
 )
 
 const (
-	CeExtPrefix = "CE_IN_EXT_"
+	CeInEnvExtPrefix   = "CE_IN_EXT_"
+	CeInEnvID          = "CE_IN_ID"
+	CeInEnvSource      = "CE_IN_SOURCE"
+	CeInEnvType        = "CE_IN_TYPE"
+	CeInEnvSubject     = "CE_IN_SUBJECT"
+	CeInEnvTime        = "CE_IN_TIME"
+	CeInEnvDataSchema  = "CE_IN_DATASCHEMA"
+	CeInEnvContentType = "CE_IN_CONTENTTYPE"
+	CeInEnvData        = "CE_IN_DATA"
 
-	CeEnvID          = "CE_IN_ID"
-	CeEnvSource      = "CE_IN_SOURCE"
-	CeEnvType        = "CE_IN_TYPE"
-	CeEnvSubject     = "CE_IN_SUBJECT"
-	CeEnvTime        = "CE_IN_TIME"
-	CeEnvDataSchema  = "CE_IN_DATASCHEMA"
-	CeEnvContentType = "CE_IN_CONTENTTYPE"
-	CeEnvData        = "CE_IN_DATA"
+	CeOutEnvExt         = "CE_OUT_EXTS"
+	CeOutEnvID          = "CE_OUT_ID"
+	CeOutEnvSource      = "CE_OUT_SOURCE"
+	CeOutEnvType        = "CE_OUT_TYPE"
+	CeOutEnvSubject     = "CE_OUT_SUBJECT"
+	CeOutEnvTime        = "CE_OUT_TIME"
+	CeOutEnvDataSchema  = "CE_OUT_DATASCHEMA"
+	CeOutEnvContentType = "CE_OUT_CONTENTTYPE"
+	CeOutEnvData        = "CE_OUT_DATA"
 )
 
 func EvnsFromEvent(e *event.Event) []string {
 	envs := []string{}
-	envs = append(envs, env(CeEnvID, e.ID()))
-	envs = append(envs, env(CeEnvSource, e.Source()))
-	envs = append(envs, env(CeEnvType, e.Type()))
-	envs = append(envs, env(CeEnvSubject, e.Subject()))
-	envs = append(envs, env(CeEnvTime, e.Time().Unix()))
-	envs = append(envs, env(CeEnvDataSchema, e.DataSchema()))
-	envs = append(envs, env(CeEnvContentType, e.DataContentType()))
-	envs = append(envs, env(CeEnvData, base64.StdEncoding.EncodeToString(e.Data())))
+	envs = append(envs, envStr(CeInEnvID, e.ID()))
+	envs = append(envs, envStr(CeInEnvSource, e.Source()))
+	envs = append(envs, envStr(CeInEnvType, e.Type()))
+	envs = append(envs, envStr(CeInEnvSubject, e.Subject()))
+	envs = append(envs, envStr(CeInEnvTime, e.Time().Unix()))
+	envs = append(envs, envStr(CeInEnvDataSchema, e.DataSchema()))
+	envs = append(envs, envStr(CeInEnvContentType, e.DataContentType()))
+	// Data will be base64 string?
+	envs = append(envs, envStr(CeInEnvData, string(e.Data())))
 	for k, v := range e.Extensions() {
 		// Only support strings.
 		if str, ok := v.(string); ok {
-			envs = append(envs, env(CeExtPrefix+strings.ToUpper(k), str))
+			envs = append(envs, envStr(CeInEnvExtPrefix+strings.ToUpper(k), str))
 		}
 	}
 	return envs
 }
 
-func env(key string, val interface{}) string {
+func envStr(key string, val interface{}) string {
 	return fmt.Sprintf("%s=%v", key, val)
+}
+
+func ValueFromEnv(preemptive, key string) string {
+	if preemptive != "" {
+		return preemptive
+	}
+	return os.Getenv(key)
+}
+
+func ExtsFromEnv(preemptive []string) []string {
+	if len(preemptive) > 0 {
+		return preemptive
+	}
+	exts := os.Getenv(CeOutEnvExt)
+	return strings.Split(exts, ",")
 }

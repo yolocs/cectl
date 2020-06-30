@@ -18,6 +18,9 @@ github.com/cloudevents/sdk-go/v2/types
 # github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 ## explicit
 github.com/google/shlex
+# github.com/google/uuid v1.1.1
+## explicit
+github.com/google/uuid
 # github.com/hashicorp/golang-lru v0.5.3
 github.com/hashicorp/golang-lru/simplelru
 # github.com/inconshreveable/mousetrap v1.0.0

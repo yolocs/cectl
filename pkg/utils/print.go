@@ -6,14 +6,24 @@ import (
 )
 
 func Println(format string, a ...interface{}) {
+	if len(a) == 0 {
+		fmt.Println(format)
+		return
+	}
 	fmt.Printf(format+"\n", a)
 }
 
 func Errorln(format string, a ...interface{}) {
+	if len(a) == 0 {
+		fmt.Fprintln(os.Stderr, "ERROR: "+format)
+	}
 	fmt.Fprintf(os.Stderr, "ERROR: "+format+"\n", a)
 }
 
 func Warnln(format string, a ...interface{}) {
+	if len(a) == 0 {
+		fmt.Fprintln(os.Stderr, "WARN: "+format)
+	}
 	fmt.Fprintf(os.Stderr, "WARN: "+format+"\n", a)
 }
 
