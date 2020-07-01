@@ -12,7 +12,8 @@ import (
 	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
-	"github.com/yolocs/cectl/pkg/utils"
+	"github.com/yolocs/cectl/pkg/env"
+	"github.com/yolocs/cectl/pkg/log"
 )
 
 var (
@@ -32,45 +33,7 @@ var (
 		Short: "Send a CloudEvent to target",
 		Long:  "Send a CloudEvent to target",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := defaultAttrs(); err != nil {
-				utils.Errorln("Missing CloudEvent attribtues: %v", err)
-				return
-			}
-
-			e := event.New()
-			e.SetID(ceID)
-			e.SetTime(time.Now())
-			e.SetSource(ceSource)
-			e.SetType(ceType)
-			e.SetSubject(ceSubject)
-			e.SetDataSchema(ceDataSchema)
-			e.SetDataContentType(ceContentType)
-			e.SetData(ceContentType, ceData)
-			for _, ext := range ceExts {
-				p := strings.Split(ext, "=")
-				e.SetExtension(strings.ToLower(p[0]), strings.ToLower(p[1]))
-			}
-
-			ctx := context.TODO()
-			req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, nil)
-			if err != nil {
-				utils.Errorln("Failed to construct http request: %v", err)
-				return
-			}
-			if err := cehttp.WriteRequest(ctx, (*binding.EventMessage)(&e), req); err != nil {
-				utils.Errorln("Failed to construct http request: %v", err)
-				return
-			}
-
-			resp, err := http.DefaultClient.Do(req)
-			// TODO: retry
-			if err != nil {
-				utils.Errorln("Failed to send CloudEvent: %v", err)
-			} else if resp.StatusCode/100 != 2 {
-				utils.Errorln("Failed to send CloudEvent: resp code = %d", resp.StatusCode)
-			}
-
-			utils.Println("Event sent.")
+			runSend(context.TODO())
 		},
 	}
 )
@@ -89,24 +52,65 @@ func init() {
 	rootCmd.AddCommand(sendCmd)
 }
 
+func runSend(ctx context.Context) {
+	if err := defaultAttrs(); err != nil {
+		log.Errorln("Missing CloudEvent attribtues: %v", err)
+		return
+	}
+
+	e := event.New()
+	e.SetID(ceID)
+	e.SetTime(time.Now())
+	e.SetSource(ceSource)
+	e.SetType(ceType)
+	e.SetSubject(ceSubject)
+	e.SetDataSchema(ceDataSchema)
+	e.SetDataContentType(ceContentType)
+	e.SetData(ceContentType, ceData)
+	for _, ext := range ceExts {
+		p := strings.Split(ext, "=")
+		e.SetExtension(strings.ToLower(p[0]), strings.ToLower(p[1]))
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, nil)
+	if err != nil {
+		log.Errorln("Failed to construct http request: %v", err)
+		return
+	}
+	if err := cehttp.WriteRequest(ctx, (*binding.EventMessage)(&e), req); err != nil {
+		log.Errorln("Failed to construct http request: %v", err)
+		return
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	// TODO: retry
+	if err != nil {
+		log.Errorln("Failed to send CloudEvent: %v", err)
+	} else if resp.StatusCode/100 != 2 {
+		log.Errorln("Failed to send CloudEvent: resp code = %d", resp.StatusCode)
+	}
+
+	log.Println("Event sent.")
+}
+
 func defaultAttrs() error {
 	// Required fields.
-	if ceID = utils.ValueFromEnv(ceID, utils.CeOutEnvID); ceID == "" {
+	if ceID = env.ValueFromEnv(ceID, env.CeOutEnvID); ceID == "" {
 		ceID = uuid.New().String()
 	}
-	if ceSource = utils.ValueFromEnv(ceSource, utils.CeOutEnvSource); ceSource == "" {
+	if ceSource = env.ValueFromEnv(ceSource, env.CeOutEnvSource); ceSource == "" {
 		return errors.New("Event source missing")
 	}
-	if ceType = utils.ValueFromEnv(ceType, utils.CeOutEnvType); ceType == "" {
+	if ceType = env.ValueFromEnv(ceType, env.CeOutEnvType); ceType == "" {
 		return errors.New("Event source missing")
 	}
 
 	// Optional
-	ceSubject = utils.ValueFromEnv(ceSubject, utils.CeOutEnvSubject)
-	ceDataSchema = utils.ValueFromEnv(ceDataSchema, utils.CeOutEnvDataSchema)
-	ceContentType = utils.ValueFromEnv(ceContentType, utils.CeOutEnvContentType)
-	ceData = utils.ValueFromEnv(ceData, utils.CeOutEnvData)
-	ceExts = utils.ExtsFromEnv(ceExts)
+	ceSubject = env.ValueFromEnv(ceSubject, env.CeOutEnvSubject)
+	ceDataSchema = env.ValueFromEnv(ceDataSchema, env.CeOutEnvDataSchema)
+	ceContentType = env.ValueFromEnv(ceContentType, env.CeOutEnvContentType)
+	ceData = env.ValueFromEnv(ceData, env.CeOutEnvData)
+	ceExts = env.ExtsFromEnv(ceExts)
 
 	return nil
 }

@@ -16,7 +16,8 @@ import (
 	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
-	"github.com/yolocs/cectl/pkg/utils"
+	"github.com/yolocs/cectl/pkg/env"
+	"github.com/yolocs/cectl/pkg/log"
 )
 
 var (
@@ -29,34 +30,7 @@ var (
 		Short: "Listen CloudEvents and trigger action",
 		Long:  "Listen CloudEvents and trigger action",
 		Run: func(cmd *cobra.Command, args []string) {
-			parts, err := shlex.Split(command)
-			if err != nil {
-				utils.Errorln("Failed to parse command: %v", err)
-				return
-			}
-			if len(parts) <= 0 {
-				utils.Errorln("Command is empty")
-				return
-			}
-
-			listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-			if err != nil {
-				utils.Errorln("Failed to create TCP listener: %v", err)
-				return
-			}
-
-			server = &http.Server{
-				Addr: listener.Addr().String(),
-				Handler: &handler{
-					path: parts[0],
-					args: parts[1:],
-				},
-			}
-			setupCloseHandler()
-
-			if err := server.Serve(listener); err != nil {
-				utils.Warnln("Server closed: %v", err)
-			}
+			runListen(context.Background())
 		},
 	}
 )
@@ -68,11 +42,45 @@ func init() {
 	rootCmd.AddCommand(listenCmd)
 }
 
-func setupCloseHandler() {
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+func runListen(ctx context.Context) {
+	parts, err := shlex.Split(command)
+	if err != nil {
+		log.Errorln("Failed to parse command: %v", err)
+		return
+	}
+	if len(parts) <= 0 {
+		log.Errorln("Command is empty")
+		return
+	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Errorln("Failed to create TCP listener: %v", err)
+		return
+	}
+
+	server = &http.Server{
+		Addr: listener.Addr().String(),
+		Handler: &handler{
+			path: parts[0],
+			args: parts[1:],
+		},
+	}
+	setupCloseHandler(ctx)
+
+	if err := server.Serve(listener); err != nil {
+		log.Warnln("Server closed: %v", err)
+	}
+}
+
+func setupCloseHandler(ctx context.Context) {
+	term := make(chan os.Signal)
+	signal.Notify(term, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-c
+		select {
+		case <-term:
+		case <-ctx.Done():
+		}
 		fmt.Println("\nTerminating...")
 		if server != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -91,16 +99,16 @@ type handler struct {
 func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	e, err := toEvent(req)
 	if err != nil {
-		utils.Errorln("Invalid request: %v", err)
+		log.Errorln("Invalid request: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
 	c := exec.CommandContext(req.Context(), h.path, h.args...)
-	c.Env = append(os.Environ(), utils.EvnsFromEvent(e)...)
+	c.Env = append(os.Environ(), env.EvnsFromEvent(e)...)
 	output, err := c.CombinedOutput()
-	utils.PrintCmdOutput(e.ID(), output)
+	log.PrintCmdOutput(e.ID(), output)
 	if err != nil {
-		utils.Errorln("Executing command returned error: %v", err)
+		log.Errorln("Executing command returned error: %v", err)
 	}
 }
 
@@ -108,7 +116,7 @@ func toEvent(request *http.Request) (*event.Event, error) {
 	message := cehttp.NewMessageFromHttpRequest(request)
 	defer func() {
 		if err := message.Finish(nil); err != nil {
-			utils.Warnln("Failed to close message: %v", err)
+			log.Warnln("Failed to close message: %v", err)
 		}
 	}()
 	// If encoding is unknown, the message is not an event.
