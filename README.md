@@ -58,5 +58,5 @@ All CloudEvent attributes were passed in as env vars which could be used in your
 
 ## References
 
-[CloudEvent Spec](https://github.com/cloudevents/spec)
-[CE Go SDK](https://github.com/cloudevents/sdk-go)
+- [CloudEvent Spec](https://github.com/cloudevents/spec)
+- [CE Go SDK](https://github.com/cloudevents/sdk-go)
