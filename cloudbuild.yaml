@@ -4,7 +4,7 @@ steps:
   args: [ '-c', "gcloud secrets versions access latest --secret=dockerhub --format='get(payload.data)' | tr '_-' '/+' | base64 -d > decrypted-data.txt" ]
 - name: gcr.io/cloud-builders/docker
   entrypoint: 'bash'
-  args: [ '-c', 'docker login --username=my-user --password-stdin < decrypted-data.txt']
+  args: [ '-c', 'docker login --username=cshou --password-stdin < decrypted-data.txt']
 - id: Build dockerfile
   name: gcr.io/cloud-builders/docker
   args:
